@@ -1,1 +1,1 @@
-"# ASPDotNetCoreCICD-" 
+# ASPDotNetCoreCICD
