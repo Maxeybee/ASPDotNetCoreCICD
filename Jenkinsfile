@@ -3,120 +3,84 @@ pipeline {
     environment {
         SiteName = "CoreWebApp"
     }
-    
-    // GLOBAL STAGES
     stages{
-        // QA STEPS
-        stage("QA Steps"){
+        stage("Check Stage Information") {
             when {
-                beforeAgent true
-                branch "stage"
+                branch 'stage'             
             }
-
-            agent { node { label 'qa-windows-agent' } }  
-            // LIST OF QA Stages
-            stages(){
-                stage('QA Clean And Build') {    
-                    steps {
-                        bat "dotnet restore ./${env.SiteName}/${env.SiteName}.csproj"
-                        bat "dotnet clean"
-                        bat "dotnet build --configuration Release"
-                    }
-                }
-                stage('QA MAL Backup') {
-                    steps {
-                        script{
-                            try{
-                                powershell "./PS_Scripts/QA/BackupCoreWebApp.ps1"
-                            } catch (err){
-                                echo err.getMessage()
-                            }
-                        }
-                    }
-                }
-                stage('QA Stop App'){
-                    steps{
-                        script{
-                            try{
-                                powershell "./PS_Scripts/QA/StopApp.ps1"
-                            } catch (err){
-                                echo err.getMessage()
-                            }
-                        }
-                    }
-                }
-                stage('QA Publish on IIS') {
-                    steps {
-                        bat "dotnet publish ./${env.SiteName}/${env.SiteName}.csproj --output D:/inetpub/wwwroot/${env.SiteName}"
-                    }
-                }
-                stage('QA Replace Web Config') {
-                    steps {
-                        powershell "Copy-Item ./web.config -Destination D:/inetpub/wwwroot/${env.SiteName}"
-                    }
-                }
-                stage('QA Convert to Web App') {
-                    steps {
-                        powershell "./PS_Scripts/QA/ConvertApp.ps1"
-                        powershell "New-Item D:/inetpub/wwwroot/MAL/logs -itemType Directory"
-                        bat "cmd /c icacls D:/inetpub/wwwroot/MAL /grant Everyone:(OI)(CI)F"
-                    }
-                }
+            steps {
+                script {
+                    env.WindowsServer = "QA"
+                    env.AgentLabel = "qa-windows-agent"
+                    env.publishPath = "D:/inetpub/wwwroot/${env.SiteName}"
+                    env.newItemPath = "D:/inetpub/wwwroot/MAL/logs"
+                    env.icalcPath = "D:/inetpub/wwwroot/MAL"
+                    //env.DeployPath = "C:/jenkins-agent/workspace/My_Portal_Pipeline_stage/${env.SiteName}/${env.PackageName}"
+                } 
             }
         }
-        // PROD STEPS
-        stage("PROD Steps"){
+        stage("Check Prod Information"){
             when {
-                beforeAgent true
-                branch "master"
+                branch 'master'             
             }
-            agent { node { label 'prod-windows-agent' } }  
-            // LIST OF PROD Stages
+            steps {
+                script {
+                    env.WindowsServer = "PROD"
+                    env.AgentLabel = "prod-windows-agent"
+                    env.publishPath = "D:/inetpub/MyWindDashboard/${env.SiteName}"
+                    env.newItemPath = "D:/inetpub/MyWindDashboard/MAL/logs"
+                    env.icalcPath = "D:/inetpub/MyWindDashboard/MAL"
+                    //env.DeployPath = "C:/jenkins-agent/workspace/My_Portal_Pipeline_stage/${env.SiteName}/${env.PackageName}"
+                } 
+            }
+        }
+        stage("Start"){
+            agent { node { label env.AgentLabel } }
             stages(){
-                stage('PROD Clean And Build') {    
+                stage('Clean And Build') {    
                     steps {
                         bat "dotnet restore ./${env.SiteName}/${env.SiteName}.csproj"
                         bat "dotnet clean"
                         bat "dotnet build --configuration Release"
                     }
                 }
-                stage('PROD MAL Backup') {
+                stage('MAL Backup') {
                     steps {
                         script{
                             try{
-                                powershell "./PS_Scripts/PROD/BackupCoreWebApp.ps1"
+                                powershell "./PS_Scripts/${env.WindowsServer}/BackupCoreWebApp.ps1"
                             } catch (err){
                                 echo err.getMessage()
                             }
                         }
                     }
                 }
-                stage('PROD Stop App'){
+                stage('Stop App'){
                     steps{
                         script{
                             try{
-                                powershell "./PS_Scripts/PROD/StopApp.ps1"
+                                powershell "./PS_Scripts/${env.WindowsServer}/StopApp.ps1"
                             } catch (err){
                                 echo err.getMessage()
                             }
                         }
                     }
                 }
-                stage('PROD Publish on IIS') {
+                stage('Publish on IIS') {
                     steps {
-                        bat "dotnet publish ./${env.SiteName}/${env.SiteName}.csproj --output D:/inetpub/MyWindDashboard/${env.SiteName}"
+                        bat "dotnet publish ./${env.SiteName}/${env.SiteName}.csproj --output ${env.publishPath}"
                     }
                 }
-                stage('PROD Replace Web Config') {
+                stage('Replace Web Config') {
                     steps {
-                        powershell "Copy-Item ./web.config -Destination D:/inetpub/MyWindDashboard/${env.SiteName}"
+                        powershell "Copy-Item ./web.config -Destination ${env.publishPath}"
                     }
                 }
-                stage('PROD Convert to Web App') {
+                stage('Convert to Web App') {
                     steps {
-                        powershell "./PS_Scripts/PROD/ConvertApp.ps1"
-                        powershell "New-Item D:/inetpub/MyWindDashboard/MAL/logs -itemType Directory"
-                        bat "cmd /c icacls D:/inetpub/MyWindDashboard/MAL /grant Everyone:(OI)(CI)F"
+                        powershell "./PS_Scripts/${env.WindowsServer}/ConvertApp.ps1"
+                        powershell "New-Item ${env.newItemPath} -itemType Directory"
+                        bat "cmd /c icacls ${env.icalcPath} /grant Everyone:(OI)(CI)F"
                     }
                 }
             }
